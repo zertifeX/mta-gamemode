@@ -137,9 +137,10 @@ function JobLogistician:onMarkerHit(hitElement, dim)
 						function()
 							local duration = getRealTime().timestamp - hitElement.m_LastJobAction
 							hitElement.m_LastJobAction = getRealTime().timestamp
+							local income = self:calculateJobLevelPay(hitElement, self.m_MoneyPerTransport)
 							outputDebug(getDistanceBetweenPoints3D(hitElement:getData("Logistician:LastCrane").m_Object:getPosition(), crane.m_Object:getPosition()))
-							StatisticsLogger:getSingleton():addJobLog(hitElement, "jobLogistician", duration, self.m_MoneyPerTransport * JOB_PAY_MULTIPLICATOR, nil, nil, math.floor(10*JOB_EXTRA_POINT_FACTOR), nil)
-							self.m_BankAccount:transferMoney({hitElement, true}, self.m_MoneyPerTransport * JOB_PAY_MULTIPLICATOR, "Logistiker Job", "Job", "Logistician")
+							StatisticsLogger:getSingleton():addJobLog(hitElement, "jobLogistician", duration, income, nil, nil, math.floor(10*JOB_EXTRA_POINT_FACTOR), nil)
+							self.m_BankAccount:transferMoney({hitElement, true}, income, "Logistiker Job", "Job", "Logistician")
 							hitElement:givePoints(math.floor(10*JOB_EXTRA_POINT_FACTOR))
 						end)
 					else

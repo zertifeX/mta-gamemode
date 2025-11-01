@@ -147,7 +147,7 @@ function JobFarmer:storeHit(hitElement, matchingDimension)
 			end
 			hitElement.m_HasSeeds = false
 
-			local income = self.m_CurrentSeeds[player]*MONEY_PER_SEED * JOB_PAY_MULTIPLICATOR
+			local income = self:calculateJobLevelPay(player, self.m_CurrentSeeds[player]*MONEY_PER_SEED)
 			local duration = getRealTime().timestamp - player.m_LastJobAction
 			player.m_LastJobAction = getRealTime().timestamp
 			StatisticsLogger:getSingleton():addJobLog(player, "jobFarmer.transport", duration, income, nil, nil, math.floor(math.ceil(self.m_CurrentSeeds[player]/10)*JOB_EXTRA_POINT_FACTOR))
@@ -289,7 +289,7 @@ function JobFarmer:deliveryHit (hitElement,matchingDimension)
 	if player and matchingDimension and getElementModel(hitElement) == getVehicleModelFromName("Walton") and hitElement == player.jobVehicle then
 		if self.m_CurrentPlants[player] and self.m_CurrentPlants[player] > 0 then
 			if hitElement.m_HasPlants then
-				local income = self.m_CurrentPlants[player]*MONEY_PER_PLANT * JOB_PAY_MULTIPLICATOR
+				local income = self:calculateJobLevelPay(player, self.m_CurrentPlants[player]*MONEY_PER_PLANT)
 				local duration = getRealTime().timestamp - player.m_LastJobAction
 				player.m_LastJobAction = getRealTime().timestamp
 				StatisticsLogger:getSingleton():addJobLog(player, "jobFarmer.transport", duration, income, nil, nil, math.floor(math.ceil(self.m_CurrentPlants[player]/10)*JOB_EXTRA_POINT_FACTOR))
@@ -401,7 +401,7 @@ function JobFarmer:createPlant(position, vehicle)
 		setTimer(function (o) o.isFarmAble = true end, 1000*7.5, 1, object)
 		setElementVisibleTo(object, client, true)
 
-		local income = MONEY_PLANT_TRACTOR * JOB_PAY_MULTIPLICATOR	
+		local income = self:calculateJobLevelPay(client, MONEY_PLANT_TRACTOR)
 		self.m_PlayerIncomeCache[client].tractor = self.m_PlayerIncomeCache[client].tractor + income
 		if self.m_PlayerIncomeCache[client].lastAction == 0 then
 			self.m_PlayerIncomeCache[client].lastAction = getRealTime().timestamp
@@ -420,14 +420,14 @@ function JobFarmer:collectPlant(hitElement, matchingDimension)
 			local distance = getDistanceBetweenPoints3D(pos, source.position)
 			if distance > 4 then return end
 			table.removevalue(self.m_Plants, source.m_Plant) -- unsure if this even works?
-			destroyElement(source.m_Plant)
-			destroyElement(source)
+		destroyElement(source.m_Plant)
+		destroyElement(source)
 
-			local income = MONEY_PLANT_HARVESTER * JOB_PAY_MULTIPLICATOR
-			self.m_PlayerIncomeCache[player].combine = self.m_PlayerIncomeCache[player].combine + income
-			if self.m_PlayerIncomeCache[player].lastAction == 0 then
-				self.m_PlayerIncomeCache[player].lastAction = getRealTime().timestamp
-			end
+		local income = self:calculateJobLevelPay(player, MONEY_PLANT_HARVESTER)
+		self.m_PlayerIncomeCache[player].combine = self.m_PlayerIncomeCache[player].combine + income
+		if self.m_PlayerIncomeCache[player].lastAction == 0 then
+			self.m_PlayerIncomeCache[player].lastAction = getRealTime().timestamp
+		end
 			self.m_CurrentPlantsFarm = self.m_CurrentPlantsFarm + 1
 			self:updateClientData()
 		end

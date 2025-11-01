@@ -1464,6 +1464,15 @@ function Player:detachPlayerObject(object, collisionNextFrame)
 	if not isElement(self) or not self:isLoggedIn() then return end
 	if isElement(object) and (self:getPlayerAttachedObject() == object) then
 		local model = object.model
+		
+		if object.m_Jewelry and JewelryStoreRobberyManager:isInstantiated() and JewelryStoreRobberyManager:getSingleton().m_RobberyInstance then
+			local robberyInstance = JewelryStoreRobberyManager:getSingleton().m_RobberyInstance
+			if robberyInstance.m_DeliveryProcesses and robberyInstance.m_DeliveryProcesses[self] then
+				self:sendInfo(_("Durch das Ablegen der Beute wurde die Abgabe abgebrochen!", self))
+				robberyInstance:cancelDeliveryProcess(self)
+			end
+		end
+		
 		if PlayerAttachObjects[model] then
 			local settings = PlayerAttachObjects[model]
 			self:toggleControlsWhileObjectAttached(true, unpack(self.m_PlayerAttachedObjectSettings))

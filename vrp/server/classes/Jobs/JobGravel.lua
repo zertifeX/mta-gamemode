@@ -239,12 +239,13 @@ function JobGravel:Event_onGravelMine(rockDestroyed, times)
 			local duration = getRealTime().timestamp - client.m_LastJobAction
 			client.m_LastJobAction = getRealTime().timestamp
 			local points = 0
-			self.m_BankAccount:transferMoney({client, true}, times*LOAN_MINING * JOB_PAY_MULTIPLICATOR, "Kiesgruben-Job", "job", "gravel.mining")
+			local income = self:calculateJobLevelPay(client, times*LOAN_MINING)
+			self.m_BankAccount:transferMoney({client, true}, income, "Kiesgruben-Job", "job", "gravel.mining")
 			if chance(6) then
 				points = math.floor(1*JOB_EXTRA_POINT_FACTOR)
 				client:givePoints(points)
 			end
-			StatisticsLogger:getSingleton():addJobLog(client, "jobGravel.mining", duration, times*LOAN_MINING * JOB_PAY_MULTIPLICATOR, nil, nil, points)
+			StatisticsLogger:getSingleton():addJobLog(client, "jobGravel.mining", duration, income, nil, nil, points)
 		end
 
 		self:updateGravelAmount("mined", true)
@@ -285,7 +286,8 @@ function JobGravel:Event_onCollectingContainerHit(track)
 
 					if not self.m_DozerDropTimer[client] then
 						self.m_DozerDropTimer[client] = setTimer(function()
-							local loan = LOAN_DOZER * (self.m_DozerDropStones[client] or 0) * JOB_PAY_MULTIPLICATOR
+							local baseLoan = LOAN_DOZER * (self.m_DozerDropStones[client] or 0)
+							local loan = self:calculateJobLevelPay(client, baseLoan)
 							local duration = getRealTime().timestamp - client.m_LastJobAction
 							client.m_LastJobAction = getRealTime().timestamp
 							local points = 0
@@ -407,7 +409,7 @@ end
 function JobGravel:giveDumperDeliverLoan(player)
 	local amount = self.m_DumperDeliverStones[player] or 0
 	if amount > MAX_STONES_IN_DUMPER then amount = MAX_STONES_IN_DUMPER end
-	local loan = amount*LOAN_DUMPER * JOB_PAY_MULTIPLICATOR
+	local loan = self:calculateJobLevelPay(player, amount*LOAN_DUMPER)
 	local duration = getRealTime().timestamp - player.m_LastJobAction
 	local points = math.floor(math.floor(amount/2)*JOB_EXTRA_POINT_FACTOR)
 	player.m_LastJobAction = getRealTime().timestamp

@@ -99,5 +99,11 @@ function Job:countPlayers()
 	return count
 end
 
+function Job:calculateJobLevelPay(player, basePay)
+	-- Calculate pay with job level bonus
+	local jobLevelMultiplier = calculateJobLevelPayMultiplier(player:getJobLevel())
+	return math.floor(basePay * JOB_PAY_MULTIPLICATOR * jobLevelMultiplier)
+end
+
 Job.start = pure_virtual
 

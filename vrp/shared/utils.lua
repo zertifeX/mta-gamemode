@@ -476,6 +476,15 @@ function calculatePointsToNextLevel(currentLevel)
 	return (currentLevel+2)^3 * 10
 end
 
+function calculateJobLevelPayMultiplier(jobLevel)
+	-- Base multiplier is 1.0, each job level adds 2% bonus
+	-- Job Level 0: 1.0x
+	-- Job Level 1: 1.02x
+	-- Job Level 5: 1.1x
+	-- Job Level 10: 1.2x (20% max bonus)
+	return 1.0 + (jobLevel * 0.02)
+end
+
 function getRandomUniqueNick()
 	local randomNick
 	repeat

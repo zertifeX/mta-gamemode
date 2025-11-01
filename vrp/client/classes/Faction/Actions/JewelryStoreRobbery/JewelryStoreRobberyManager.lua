@@ -12,16 +12,21 @@ function JewelryStoreRobberyManager:constructor()
 	self.m_Interior = 0
 	self.m_Dimension = 60001
 
-	addRemoteEvents{"jewelryStoreRobberySound", "jewelryStoreRobberyPedAnimation", "jewelryStoreRobberyAlarmStart", "jewelryStoreRobberyAlarmEnd", "jewelryStoreRobberyBreakGlass"}
+	addRemoteEvents{"jewelryStoreRobberySound", "jewelryStoreRobberyPedAnimation", "jewelryStoreRobberyAlarmStart", "jewelryStoreRobberyAlarmEnd", "jewelryStoreRobberyBreakGlass", "jewelryStoreRobberyDeliveryStart", "jewelryStoreRobberyDeliveryCancel"}
 
 	self.m_AlarmInside = nil
 	self.m_AlarmOutside = nil
+	self.m_DeliveryCountdown = nil
+	self.m_DeliveryCancelGUI = nil
+	self.m_CancelButton = nil
 
 	addEventHandler("jewelryStoreRobberySound", root, bind(self.Event_PlaySound, self))
 	addEventHandler("jewelryStoreRobberyPedAnimation", root, bind(self.Event_ShopPedAnimation, self))
 	addEventHandler("jewelryStoreRobberyAlarmStart", root, bind(self.Event_StartAlarm, self))
 	addEventHandler("jewelryStoreRobberyAlarmEnd", root, bind(self.Event_EndAlarm, self))
 	addEventHandler("jewelryStoreRobberyBreakGlass", root, bind(self.Event_BreakGlass, self))
+	addEventHandler("jewelryStoreRobberyDeliveryStart", root, bind(self.Event_DeliveryStart, self))
+	addEventHandler("jewelryStoreRobberyDeliveryCancel", root, bind(self.Event_DeliveryCancel, self))
 end
 
 function JewelryStoreRobberyManager:destructor()
@@ -75,4 +80,58 @@ function JewelryStoreRobberyManager:Event_EndAlarm()
 
 	self.m_AlarmInside = nil
 	self.m_AlarmOutside = nil
+end
+
+function JewelryStoreRobberyManager:Event_DeliveryStart(time, deliveryType)
+	-- Cancel any existing countdown
+	if self.m_DeliveryCountdown then
+		delete(self.m_DeliveryCountdown)
+		self.m_DeliveryCountdown = nil
+	end
+	
+	-- Cancel any existing cancel GUI
+	if self.m_DeliveryCancelGUI then
+		delete(self.m_DeliveryCancelGUI)
+		self.m_DeliveryCancelGUI = nil
+	end
+	
+	-- Create the countdown with icon (similar to treatment)
+	local title = deliveryType == "evil" and "Beute abgeben" or "Beute sicherstellen"
+	local icon = "files/images/Inventory/items/Objekte/dufflebag.png"
+	self.m_DeliveryCountdown = ShortCountdown:new(time, title, icon)
+	
+	-- Create cancel button next to countdown (simple GUIForm approach)
+	setTimer(function()
+		if self.m_DeliveryCountdown then
+			local buttonX = self.m_DeliveryCountdown.m_AbsoluteX + self.m_DeliveryCountdown.m_Width
+			local buttonY = self.m_DeliveryCountdown.m_AbsoluteY
+			local buttonWidth = screenWidth*0.06
+			local buttonHeight = screenHeight*0.03
+			
+			self.m_DeliveryCancelGUI = GUIForm:new(buttonX, buttonY, buttonWidth, buttonHeight, false)
+			self.m_CancelButton = GUIButton:new(0, 0, buttonWidth, buttonHeight, "Abbruch", self.m_DeliveryCancelGUI)
+			self.m_CancelButton.onLeftClick = function()
+				triggerServerEvent("jewelryStoreRobberyDeliveryCancel", localPlayer)
+			end
+		end
+	end, 50, 1)
+end
+
+function JewelryStoreRobberyManager:Event_DeliveryCancel()
+	-- Cancel the countdown
+	if self.m_DeliveryCountdown then
+		delete(self.m_DeliveryCountdown)
+		self.m_DeliveryCountdown = nil
+	end
+	
+	-- Cancel the cancel button
+	if self.m_CancelButton then
+		self.m_CancelButton = nil
+	end
+	
+	-- Cancel the cancel GUI
+	if self.m_DeliveryCancelGUI then
+		delete(self.m_DeliveryCancelGUI)
+		self.m_DeliveryCancelGUI = nil
+	end
 end

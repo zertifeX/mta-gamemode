@@ -101,7 +101,7 @@ function JewelryStoreRobberyManager:constructor()
     self.m_ShopPed:setInterior(self.m_Interior)
     self.m_ShopPed:setDimension(self.m_Dimension)
     self.m_ShopPed:setImmortal(true)
-	self.m_ShopPed:setFrozen(true)
+	setElementFrozen(self.m_ShopPed, true)
     self.m_ShopPed.onTargetted = bind(self.Event_PedTargetted, self)
 
 	self.m_MinJewelryRobberyStateMembers = 3

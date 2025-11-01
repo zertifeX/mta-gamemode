@@ -7,6 +7,8 @@
 -- ****************************************************************************
 
 JewelryStoreRobbery = inherit(Object)
+
+addRemoteEvents{"jewelryStoreRobberyDeliveryCancel"}
 JewelryStoreRobbery.StartMessages = {
 	"Ein Juweliergeschäft meldet einen Überfall!",
 	"Der Juwelier im Westen von Los Santos wird überfallen!",
@@ -42,6 +44,9 @@ function JewelryStoreRobbery:constructor(attacker, maxBags)
 
 	self.m_Players = {}
 	self.m_Bags = {}
+	
+	-- Delivery system variables
+	self.m_DeliveryProcesses = {}
 
 	--[[
 	self.m_Vehicle = TemporaryVehicle.create(493, 146.514, 164.884, 0.100, 33.591)
@@ -87,6 +92,7 @@ function JewelryStoreRobbery:constructor(attacker, maxBags)
 
 	addEventHandler("onElementClicked", self.m_EvilDeliveryPed, bind(self.Event_EvilDeliveryFaction, self))
 	addEventHandler("onElementClicked", self.m_StateDeliveryPed, bind(self.Event_StateDeliveryFaction, self))
+	addEventHandler("jewelryStoreRobberyDeliveryCancel", root, bind(self.Event_OnDeliveryCancel, self))
 
 	for index, player in pairs(JewelryStoreRobberyManager:getSingleton().m_Players) do
 		if isElement(player) then
@@ -100,6 +106,12 @@ end
 
 function JewelryStoreRobbery:destructor()
 	triggerClientEvent("jewelryStoreRobberyAlarmEnd", root)
+	
+	-- Cancel all active delivery processes
+	for player, process in pairs(self.m_DeliveryProcesses) do
+		self:cancelDeliveryProcess(player)
+	end
+	
 	for index, player in pairs(JewelryStoreRobberyManager:getSingleton().m_Players) do
 		if isElement(player) then
 			unbindKey(player, "f", "down", self.m_BreakGlass)
@@ -234,19 +246,14 @@ function JewelryStoreRobbery:Event_EvilDeliveryFaction(button, state, player)
 		if getDistanceBetweenPoints3D(player:getPosition(), source:getPosition()) < 3 then
 			if player:getFaction():isEvilFaction() and player:isFactionDuty() then
 				if player.m_PlayerAttachedObject and player.m_PlayerAttachedObject.m_Jewelry then
-					local bag = player.m_PlayerAttachedObject
-					local value = bag:getData("Value")
-					local money = math.round(value * (self.m_MaxMoney / self.m_MaxBags), 0)
-					player:detachPlayerObject(bag)
-					player:sendSuccess(_("Du hast die Beute abgegeben!", player))
-					bag:destroy()
-
-					self.m_PendingBags = self.m_PendingBags - value
-					self.m_BankAccountServer:transferMoney({"faction", player:getFaction():getId(), true}, money, "Juwelier-Beute abgegeben", "Action", "JewelryRobbery", {silent = true})
-
-					if self.m_PendingBags == 0 or self.m_MaxBags - self.m_BagsGivenOut == self.m_PendingBags then
-						JewelryStoreRobberyManager:getSingleton():stopRobbery("evil")
+					-- Check if player is already in a delivery process
+					if self.m_DeliveryProcesses[player] then
+						player:sendError(_("Du gibst bereits Beute ab! Warte bis der Vorgang abgeschlossen ist.", player))
+						return
 					end
+					
+					-- Start the delivery process
+					self:startDeliveryProcess(player, "evil", player.m_PlayerAttachedObject, source)
 				else
 					player:sendError(_("Du hast keine Beute dabei!", player))
 				end
@@ -264,19 +271,14 @@ function JewelryStoreRobbery:Event_StateDeliveryFaction(button, state, player)
 		if getDistanceBetweenPoints3D(player:getPosition(), source:getPosition()) < 3 then
 			if player:getFaction():isStateFaction() and player:isFactionDuty() then
 				if player.m_PlayerAttachedObject and player.m_PlayerAttachedObject.m_Jewelry then
-					local bag = player.m_PlayerAttachedObject
-					local value = bag:getData("Value")
-					local money = math.round(value * (self.m_MaxMoney / self.m_MaxBags), 0)
-					player:detachPlayerObject(bag)
-					player:sendSuccess(_("Du hast die Beute abgegeben!", player))
-					bag:destroy()
-
-					self.m_PendingBags = self.m_PendingBags - value
-					self.m_BankAccountServer:transferMoney({"faction", player:getFaction():getId(), true}, money, "Juwelier-Beute sichergestellt", "Action", "JewelryRobbery", {silent = true})
-
-					if self.m_PendingBags == 0 or self.m_MaxBags - self.m_BagsGivenOut == self.m_PendingBags then
-						JewelryStoreRobberyManager:getSingleton():stopRobbery("state")
+					-- Check if player is already in a delivery process
+					if self.m_DeliveryProcesses[player] then
+						player:sendError(_("Du gibst bereits Beute ab! Warte bis der Vorgang abgeschlossen ist.", player))
+						return
 					end
+					
+					-- Start the delivery process
+					self:startDeliveryProcess(player, "state", player.m_PlayerAttachedObject, source)
 				else
 					player:sendError(_("Du hast keine Beute dabei!", player))
 				end
@@ -339,5 +341,140 @@ function JewelryStoreRobbery:updateBreakingNews()
 		else
 			PlayerManager:getSingleton():breakingNews(math.randomchoice(JewelryStoreRobbery.EscapeMessages))
 		end
+	end
+end
+
+function JewelryStoreRobbery:startDeliveryProcess(player, deliveryType, bag, ped)
+	if self.m_DeliveryProcesses[player] then
+		player:sendError(_("Du gibst bereits Beute ab! Warte bis der Vorgang abgeschlossen ist.", player))
+		return false
+	end
+	
+	self.m_DeliveryProcesses[player] = {
+		type = deliveryType,
+		bag = bag,
+		ped = ped,
+		startTime = getTickCount(),
+		countdown = 30,
+		countdownTimer = nil,
+		animationTimer = nil,
+		damageHandler = nil
+	}
+	
+	player:setAnimation("ped", "idle_chat", -1, true, false, false)
+	
+	player:triggerEvent("jewelryStoreRobberyDeliveryStart", 30, deliveryType)
+	
+	self.m_DeliveryProcesses[player].damageHandler = function(attacker, weapon, bodypart, loss)
+		if loss > 0 then
+			player:sendInfo(_("Durch den Schaden wurde die Abgabe unterbrochen!", player))
+			self:cancelDeliveryProcess(player)
+		end
+	end
+	addEventHandler("onPlayerDamage", player, self.m_DeliveryProcesses[player].damageHandler)
+	
+	self.m_DeliveryProcesses[player].countdownTimer = setTimer(function()
+		if not isElement(player) or not self.m_DeliveryProcesses[player] then
+			return
+		end
+		
+		self.m_DeliveryProcesses[player].countdown = self.m_DeliveryProcesses[player].countdown - 1
+		local remaining = self.m_DeliveryProcesses[player].countdown
+		
+		if remaining <= 0 then
+			self:completeDeliveryProcess(player)
+		end
+	end, 1000, 30)
+	
+	self.m_DeliveryProcesses[player].animationTimer = setTimer(function()
+		if not isElement(player) or not self.m_DeliveryProcesses[player] then
+			return
+		end
+		
+		local process = self.m_DeliveryProcesses[player]
+		if getDistanceBetweenPoints3D(player:getPosition(), process.ped:getPosition()) > 3 then
+			player:sendError(_("Du hast dich zu weit entfernt! Der Abgabevorgang wurde abgebrochen.", player))
+			self:cancelDeliveryProcess(player)
+		end
+	end, 500, 0)
+	
+	return true
+end
+
+function JewelryStoreRobbery:cancelDeliveryProcess(player)
+	if not self.m_DeliveryProcesses[player] then
+		return
+	end
+	
+	local process = self.m_DeliveryProcesses[player]
+	
+	if isTimer(process.countdownTimer) then
+		killTimer(process.countdownTimer)
+	end
+	if isTimer(process.animationTimer) then
+		killTimer(process.animationTimer)
+	end
+	
+	if process.damageHandler and isElement(player) then
+		removeEventHandler("onPlayerDamage", player, process.damageHandler)
+	end
+	
+	if isElement(player) then
+		player:setAnimation()
+		player:triggerEvent("jewelryStoreRobberyDeliveryCancel")
+	end
+	
+	self.m_DeliveryProcesses[player] = nil
+end
+
+function JewelryStoreRobbery:completeDeliveryProcess(player)
+	if not self.m_DeliveryProcesses[player] then
+		return
+	end
+	
+	local process = self.m_DeliveryProcesses[player]
+	local bag = process.bag
+	local deliveryType = process.type
+	
+	if isTimer(process.countdownTimer) then
+		killTimer(process.countdownTimer)
+	end
+	if isTimer(process.animationTimer) then
+		killTimer(process.animationTimer)
+	end
+	
+	-- Remove damage event handler
+	if process.damageHandler and isElement(player) then
+		removeEventHandler("onPlayerDamage", player, process.damageHandler)
+	end
+	
+	player:setAnimation()
+	player:triggerEvent("jewelryStoreRobberyDeliveryCancel")
+	
+	self.m_DeliveryProcesses[player] = nil
+	
+	local value = bag:getData("Value")
+	local money = math.round(value * (self.m_MaxMoney / self.m_MaxBags), 0)
+	player:detachPlayerObject(bag)
+	player:sendSuccess(_("Du hast die Beute abgegeben!", player))
+	bag:destroy()
+
+	self.m_PendingBags = self.m_PendingBags - value
+	
+	if deliveryType == "evil" then
+		self.m_BankAccountServer:transferMoney({"faction", player:getFaction():getId(), true}, money, "Juwelier-Beute abgegeben", "Action", "JewelryRobbery", {silent = true})
+	else
+		self.m_BankAccountServer:transferMoney({"faction", player:getFaction():getId(), true}, money, "Juwelier-Beute sichergestellt", "Action", "JewelryRobbery", {silent = true})
+	end
+
+	if self.m_PendingBags == 0 or self.m_MaxBags - self.m_BagsGivenOut == self.m_PendingBags then
+		JewelryStoreRobberyManager:getSingleton():stopRobbery(deliveryType)
+	end
+end
+
+function JewelryStoreRobbery:Event_OnDeliveryCancel()
+	if self.m_DeliveryProcesses[client] then
+		client:sendInfo(_("Abgabevorgang abgebrochen!", client))
+		self:cancelDeliveryProcess(client)
 	end
 end

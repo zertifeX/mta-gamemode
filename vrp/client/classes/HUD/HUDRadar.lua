@@ -10,7 +10,10 @@ addRemoteEvents{ "HUDRadar:showRadar", "HUDRadar:hideRadar" }
 
 function HUDRadar:constructor()
 	self.m_ImageSize = 1536, 1536 --3072, 3072
-	self.m_Width, self.m_Height = 340*screenWidth/1600, 200*screenHeight/900
+	self.m_Scale = core:get("HUD", "radarScale", 1) -- Radar scale setting
+	self.m_Opacity = core:get("HUD", "mapOpacity", 1.0) -- Radar opacity setting
+	self.m_BaseWidth, self.m_BaseHeight = 340*screenWidth/1600, 200*screenHeight/900
+	self.m_Width, self.m_Height = self.m_BaseWidth * self.m_Scale, self.m_BaseHeight * self.m_Scale
 	self.m_PosX, self.m_PosY = 20*screenWidth/1600, screenHeight - self.m_Height - 20*screenWidth/1600
 	self.m_RenderTargetAll = dxCreateRenderTarget(screenWidth, screenHeight, true)
 	self.m_Diagonal = math.sqrt(self.m_Width^2+self.m_Height^2)
@@ -288,8 +291,10 @@ function HUDRadar:draw()
 	end
 
 	-- Draw renderTarget
+	local opacity = self:getOpacity()
+	local alpha = math.floor(255 * opacity)
 	if isNotInInterior then
-		dxDrawImageSection(self.m_PosX + 3, self.m_PosY + 3, self.m_Width - 6, self.m_Height - 6, self.m_Diagonal/2+3-self.m_Width/2, self.m_Diagonal/2+3-self.m_Height/2, self.m_Width-6, self.m_Height-6, self.m_RenderTarget)
+		dxDrawImageSection(self.m_PosX + 3, self.m_PosY + 3, self.m_Width - 6, self.m_Height - 6, self.m_Diagonal/2+3-self.m_Width/2, self.m_Diagonal/2+3-self.m_Height/2, self.m_Width-6, self.m_Height-6, self.m_RenderTarget, 0, 0, 0, tocolor(255, 255, 255, alpha))
 	else
 		dxDrawRectangle(self.m_PosX+3, self.m_PosY+3, self.m_Width, self.m_Height, tocolor(125, 168, 210))
 	end
@@ -508,6 +513,39 @@ end
 
 function HUDRadar:getZoom()
 	return self.m_Zoom
+end
+
+function HUDRadar:setScale(scale)
+	self.m_Scale = scale
+	self.m_Width = self.m_BaseWidth * self.m_Scale
+	self.m_Height = self.m_BaseHeight * self.m_Scale
+	self.m_PosY = screenHeight - self.m_Height - 20*screenWidth/1600
+	self.m_Diagonal = math.sqrt(self.m_Width^2+self.m_Height^2)
+	
+	-- Update render target
+	if self.m_RenderTarget and isElement(self.m_RenderTarget) then
+		destroyElement(self.m_RenderTarget)
+	end
+	self.m_RenderTarget = dxCreateRenderTarget(self.m_Diagonal, self.m_Diagonal)
+	
+	-- Recalc shortmessage positions
+	MessageBoxManager.onRadarPositionChange()
+	
+	-- Save setting
+	core:set("HUD", "radarScale", scale)
+end
+
+function HUDRadar:getScale()
+	return self.m_Scale
+end
+
+function HUDRadar:setOpacity(opacity)
+	self.m_Opacity = opacity
+	core:set("HUD", "mapOpacity", opacity)
+end
+
+function HUDRadar:getOpacity()
+	return self.m_Opacity or core:get("HUD", "mapOpacity", 1.0)
 end
 
 function HUDRadar:getPosition()

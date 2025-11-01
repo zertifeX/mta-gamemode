@@ -289,7 +289,7 @@ function SelfGUI:constructor()
 
 	self.m_SettingsGrid = GUIGridList:new(self.m_Width*0.02, self.m_Height*0.02, self.m_Width*0.3, self.m_Height*0.9, tabSettings)
 	self.m_SettingsGrid:addColumn(_"Einstellungen", 1)
-	local SettingsTable = {"HUD", "Radar", "Chat", "Spawn", "Nametag/Reddot", "Texturen", "Fahrzeuge", "Waffen", "Sounds / Radio", "Shader", "Server-Tour", "Tastenzuordnung", "Sonstiges", "Event", "Sprache"}
+	local SettingsTable = {"HUD", "Radar", "Chat", "Anpassung", "Spawn", "Nametag/Reddot", "Texturen", "Fahrzeuge", "Waffen", "Sounds / Radio", "Shader", "Server-Tour", "Tastenzuordnung", "Sonstiges", "Event", "Sprache"}
 	local item
 	for index, setting in pairs(SettingsTable) do
 		item = self.m_SettingsGrid:addItem(setting)
@@ -816,7 +816,6 @@ function SelfGUI:onSettingChange(setting)
 
 		local function updateDesignOptions(index)
 			self.m_LifeArmor:setVisible(false)
-			self.m_HUDScale:setVisible(false)
 			self.m_ChartMargin:setVisible(false)
 			self.m_ChartBlue:setVisible(false)
 			self.m_ChartDate:setVisible(false)
@@ -829,9 +828,9 @@ function SelfGUI:onSettingChange(setting)
 			if index == UIStyle.vRoleplay then
 				self.m_LifeArmor:setVisible(true)
 			elseif index == UIStyle.eXo then
-				self.m_HUDScale:setVisible(true)
+				-- HUD Scale moved to Scaling tab
 			elseif index == UIStyle.Chart then
-				self.m_HUDScale:setVisible(true)
+				-- HUD Scale moved to Scaling tab
 				self.m_ChartMargin:setVisible(true)
 				self.m_ChartBlue:setVisible(true)
 				self.m_ChartDate:setVisible(true)
@@ -901,16 +900,6 @@ function SelfGUI:onSettingChange(setting)
 		self.m_ChartFPS:setChecked(core:get("HUD", "chartFPSVisible", true))
 		self.m_ChartFPS.onChange = function (state) core:set("HUD", "chartFPSVisible", state) end
 
-		self.m_HUDScaleLabel = GUILabel:new(self.m_Width*0.4, self.m_Height*0.53, self.m_Width*0.25, self.m_Height*0.07, _"HUD-Skalierung" , self.m_SettingBG):setFontSize(0.75)
-		self.m_HUDScale = GUISlider:new(self.m_Width*0.4, self.m_Height*0.57, self.m_Width*0.25, self.m_Height*0.07, self.m_SettingBG)
-		self.m_HUDScale:setRange(0.01, 1)
-		self.m_HUDScale:setValue(core:get("HUD","scaleScroll",1))
-
-		self.m_HUDScale.onUpdate = function( scale )
-			HUDUI:getSingleton():setScale( scale );
-			core:set("HUD","scaleScroll", scale )
-		end
-
 		updateDesignOptions(core:get("HUD", "UIStyle", UIStyle.Chart)) --only show items which are relevant for current UI
 
 	elseif setting == "Radar" then
@@ -973,15 +962,6 @@ function SelfGUI:onSettingChange(setting)
 			core:set("HUD", "drawZone", state)
 		end
 
-		self.m_MapLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.43, self.m_Width*0.35, self.m_Height*0.07, _"Karten-Transparenz" , self.m_SettingBG):setFontSize(0.75)
-		self.m_MapOpacity = GUISlider:new(self.m_Width*0.02, self.m_Height*0.47, self.m_Width*0.35, self.m_Height*0.07, self.m_SettingBG)
-		self.m_MapOpacity:setRange(0.1, 1)
-		self.m_MapOpacity:setValue(core:get("HUD","mapOpacity", 0.7))
-		self.m_MapOpacity.onUpdate = function( opacity )
-			local scale = math.round(opacity, 2)
-			core:set("HUD","mapOpacity", opacity)
-		end
-
 		--Blips
 
 		GUILabel:new(self.m_Width*0.02, self.m_Height*0.58, self.m_Width*0.8, self.m_Height*0.07, _"Blips", self.m_SettingBG)
@@ -993,22 +973,94 @@ function SelfGUI:onSettingChange(setting)
 			core:set("HUD", "coloredBlips", state)
 		end
 
-		self.m_BlipScaleLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.74, self.m_Width*0.35, self.m_Height*0.07, _"Blip-Skalierung" , self.m_SettingBG):setFontSize(0.75)
-		self.m_BlipScale = GUISlider:new(self.m_Width*0.02, self.m_Height*0.78, self.m_Width*0.35, self.m_Height*0.07, self.m_SettingBG)
+		updateDesignOptions(not core:get("HUD", "showRadar", true))
+
+	elseif setting == "Anpassung" then
+
+		GUILabel:new(self.m_Width*0.02, self.m_Height*0.02, self.m_Width*0.8, self.m_Height*0.07, "UI Anpassung", self.m_SettingBG):setFontSize(1.2)
+
+		-- Reset Button
+		self.m_ResetButton = GUIButton:new(self.m_Width*0.40, self.m_Height*0.03, self.m_Width*0.15, self.m_Height*0.07, "Reset", self.m_SettingBG)
+		self.m_ResetButton.onLeftClick = function()
+			-- Reset all values to default
+			self.m_HUDScale:setValue(0.5) -- Default HUD scale
+			self.m_RadarScale:setValue(1.0) -- Default radar scale  
+			self.m_MapOpacity:setValue(1.0) -- Default map opacity
+			self.m_BlipScale:setValue(1.0) -- Default blip scale
+			self.m_SpeedoScale:setValue(1.0) -- Default speedo scale
+			self.m_SpeedoAlpha:setValue(150/255) -- Default speedo alpha
+			
+			-- Apply the changes immediately
+			HUDUI:getSingleton():setScale(0.5)
+			HUDRadar:getSingleton():setScale(1.0)
+			HUDRadar:getSingleton():setOpacity(1.0)
+			Blip.setScaleMultiplier(1.0)
+			HUDSpeedo:getSingleton():setScale(1.0)
+			HUDSpeedo:getSingleton():setAlpha(150)
+		end
+
+		-- HUD Scale
+		self.m_HUDScaleLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.12, self.m_Width*0.6, self.m_Height*0.05, "HUD-Scaling" , self.m_SettingBG):setFontSize(1.0)
+		self.m_HUDScale = GUISlider:new(self.m_Width*0.02, self.m_Height*0.17, self.m_Width*0.6, self.m_Height*0.05, self.m_SettingBG)
+		self.m_HUDScale:setRange(0.01, 1)
+		-- Convert back from stored value to slider value
+		local storedScale = core:get("HUD","hudScale", 1)
+		local sliderValue = (storedScale - 0.5) / 1.5 / 1.25
+		self.m_HUDScale:setValue(math.max(0.01, math.min(1, sliderValue)))
+		self.m_HUDScale.onUpdate = function( scale )
+			HUDUI:getSingleton():setScale( scale );
+		end
+
+		-- Minimap Scale
+		self.m_RadarScaleLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.26, self.m_Width*0.6, self.m_Height*0.05, "Minimap-Scaling" , self.m_SettingBG):setFontSize(1.0)
+		self.m_RadarScale = GUISlider:new(self.m_Width*0.02, self.m_Height*0.31, self.m_Width*0.6, self.m_Height*0.05, self.m_SettingBG)
+		self.m_RadarScale:setRange(0.5, 2)
+		self.m_RadarScale:setValue(core:get("HUD","radarScale", 1))
+		self.m_RadarScale.onUpdate = function( scale )
+			HUDRadar:getSingleton():setScale(scale)
+		end
+
+		-- Map Transparency
+		self.m_MapLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.40, self.m_Width*0.6, self.m_Height*0.05, "Minimap-Transparenz" , self.m_SettingBG):setFontSize(1.0)
+		self.m_MapOpacity = GUISlider:new(self.m_Width*0.02, self.m_Height*0.45, self.m_Width*0.6, self.m_Height*0.05, self.m_SettingBG)
+		self.m_MapOpacity:setRange(0.1, 1)
+		self.m_MapOpacity:setValue(core:get("HUD","mapOpacity", 1.0))
+		self.m_MapOpacity.onUpdate = function( opacity )
+			HUDRadar:getSingleton():setOpacity(opacity)
+			core:set("HUD","mapOpacity", opacity)
+		end
+
+		-- Blip Scale
+		self.m_BlipScaleLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.54, self.m_Width*0.6, self.m_Height*0.05, "Blip-Scaling" , self.m_SettingBG):setFontSize(1.0)
+		self.m_BlipScale = GUISlider:new(self.m_Width*0.02, self.m_Height*0.59, self.m_Width*0.6, self.m_Height*0.05, self.m_SettingBG)
 		self.m_BlipScale:setRange(0.2, 2)
 		self.m_BlipScale:setValue(core:get("HUD","blipScale", 1))
 		self.m_BlipScale.onUpdate = function( scale )
 			Blip.setScaleMultiplier(scale)
 		end
 
+		-- Speedo Scale
+		self.m_SpeedoScaleLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.68, self.m_Width*0.6, self.m_Height*0.05, "Tacho-Scaling" , self.m_SettingBG):setFontSize(1.0)
+		self.m_SpeedoScale = GUISlider:new(self.m_Width*0.02, self.m_Height*0.73, self.m_Width*0.6, self.m_Height*0.05, self.m_SettingBG)
+		self.m_SpeedoScale:setRange(0.5, 2)
+		self.m_SpeedoScale:setValue(core:get("HUD","speedoScale", 1))
+		self.m_SpeedoScale.onUpdate = function( scale )
+			HUDSpeedo:getSingleton():setScale(scale)
+		end
 
+		-- Speedo Transparency  
+		self.m_SpeedoAlphaLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.82, self.m_Width*0.6, self.m_Height*0.05, "Tacho-Transparenz" , self.m_SettingBG):setFontSize(1.0)
+		self.m_SpeedoAlpha = GUISlider:new(self.m_Width*0.02, self.m_Height*0.87, self.m_Width*0.6, self.m_Height*0.05, self.m_SettingBG)
+		self.m_SpeedoAlpha:setRange(0, 1)
+		self.m_SpeedoAlpha:setValue(core:get("HUD","SpeedoAlpha", 150/255))
+		self.m_SpeedoAlpha.onUpdate = function( scale )
+			HUDSpeedo:getSingleton():setAlpha( scale * 255 )
+			core:set("HUD","SpeedoAlpha", scale )
+		end
 
-		updateDesignOptions(not core:get("HUD", "showRadar", true))
 	elseif setting == "Chat" then
 
-
 		GUILabel:new(self.m_Width*0.02, self.m_Height*0.02, self.m_Width*0.8, self.m_Height*0.07, _"Textkanäle aktivieren/deaktivieren!", self.m_SettingBG)
-
 
 		self.m_FactionChat = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.12, self.m_Width*0.8, self.m_Height*0.04, _"Fraktionschat aktivieren", self.m_SettingBG)
 		self.m_FactionChat:setFont(VRPFont(25))
@@ -1019,21 +1071,20 @@ function SelfGUI:onSettingChange(setting)
 			setElementData(localPlayer, "FactionChatEnabled", state)
 		end
 
-		self.m_FactionChat = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.22, self.m_Width*0.8, self.m_Height*0.04, _"Unternehmenschat aktivieren", self.m_SettingBG)
-		self.m_FactionChat:setFont(VRPFont(25))
-		self.m_FactionChat:setFontSize(1)
-		self.m_FactionChat:setChecked(core:get("Chat", "enableCompanyChat", true))
-		self.m_FactionChat.onChange = function (state)
+		self.m_CompanyChat = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.22, self.m_Width*0.8, self.m_Height*0.04, _"Unternehmenschat aktivieren", self.m_SettingBG)
+		self.m_CompanyChat:setFont(VRPFont(25))
+		self.m_CompanyChat:setFontSize(1)
+		self.m_CompanyChat:setChecked(core:get("Chat", "enableCompanyChat", true))
+		self.m_CompanyChat.onChange = function (state)
 			core:set("Chat", "enableCompanyChat", state)
 			setElementData(localPlayer, "CompanyChatEnabled", state)
 		end
 
-
-		self.m_FactionChat = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.32, self.m_Width*0.8, self.m_Height*0.04, _"Firmen/Gangchat aktivieren", self.m_SettingBG)
-		self.m_FactionChat:setFont(VRPFont(25))
-		self.m_FactionChat:setFontSize(1)
-		self.m_FactionChat:setChecked(core:get("Chat", "enableGroupChat", true))
-		self.m_FactionChat.onChange = function (state)
+		self.m_GroupChat = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.32, self.m_Width*0.8, self.m_Height*0.04, _"Firmen/Gangchat aktivieren", self.m_SettingBG)
+		self.m_GroupChat:setFont(VRPFont(25))
+		self.m_GroupChat:setFontSize(1)
+		self.m_GroupChat:setChecked(core:get("Chat", "enableGroupChat", true))
+		self.m_GroupChat.onChange = function (state)
 			core:set("Chat", "enableGroupChat", state)
 			setElementData(localPlayer, "GroupChatEnabled", state)
 		end
@@ -1528,16 +1579,6 @@ function SelfGUI:onSettingChange(setting)
 		self.m_SeatbeltWarning.onChange = function (bool)
 			core:set("Vehicles", "seatbeltWarning", bool)
 		end
-		self.m_SpeedoAlphaLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.47, self.m_Width*0.35, self.m_Height*0.04, _"Tacho-Transparenz" , self.m_SettingBG)
-		:setFont(VRPFont(25)):setFontSize(1)
-		self.m_SpeedoAlpha = GUISlider:new(self.m_Width*0.02, self.m_Height*0.52, self.m_Width*0.6, self.m_Height*0.07, self.m_SettingBG)
-		self.m_SpeedoAlpha:setRange(0, 1)
-		self.m_SpeedoAlpha:setValue(core:get("HUD","SpeedoAlpha", 150/255))
-
-		self.m_SpeedoAlpha.onUpdate = function( scale )
-			HUDSpeedo:getSingleton():setAlpha( scale * 255 )
-			core:set("HUD","SpeedoAlpha", scale )
-		end
 
 		self.m_SpeedoOverlay = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.59, self.m_Width*0.6, self.m_Height*0.04, _"Tachobeleuchtung bei Licht", self.m_SettingBG)
 		:setFont(VRPFont(25)):setFontSize(1)
@@ -1550,7 +1591,7 @@ function SelfGUI:onSettingChange(setting)
 		self.m_AviationLabel = GUILabel:new(self.m_Width*0.02, self.m_Height*0.66, self.m_Width*0.35, self.m_Height*0.04, _"Flugzeug-Display" , self.m_SettingBG)
 		:setFont(VRPFont(25)):setFontSize(1)
 
-		self.m_AviationPFD = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.71, self.m_Width*0.6, self.m_Height*0.04, _"Primäre Fluganzeige (An/Aus)", self.m_SettingBG)
+		self.m_AviationPFD = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.83, self.m_Width*0.6, self.m_Height*0.04, _"Primäre Fluganzeige (An/Aus)", self.m_SettingBG)
 		:setFont(VRPFont(25)):setFontSize(1)
 		self.m_AviationPFD:setChecked(core:get("HUD", "AviationPFDOverlay", true))
 		self.m_AviationPFD.onChange = function (bool)
@@ -1558,7 +1599,7 @@ function SelfGUI:onSettingChange(setting)
 			core:set("HUD", "AviationPFDOverlay", bool)
 		end
 
-		self.m_AviationSFD = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.78, self.m_Width*0.6, self.m_Height*0.04, _"Sekundäre Fluganzeige (An/Aus)", self.m_SettingBG)
+		self.m_AviationSFD = GUICheckbox:new(self.m_Width*0.02, self.m_Height*0.88, self.m_Width*0.6, self.m_Height*0.04, _"Sekundäre Fluganzeige (An/Aus)", self.m_SettingBG)
 		:setFont(VRPFont(25)):setFontSize(1)
 		self.m_AviationSFD:setChecked(core:get("HUD", "AviationSFDOverlay", true))
 		self.m_AviationSFD.onChange = function (bool)
